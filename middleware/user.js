@@ -1,7 +1,7 @@
 const User = require('../models/User')
 const ResetToken = require('../models/ResetToken')
 const ErrorResponse = require('../utils/errorResponse')
-// const {isValidObjectId} = require('mongoose')
+const {isValidObjectId} = require('mongoose')
 
 
 
@@ -16,11 +16,11 @@ exports.isResetTokenValid = async (req,res,next)=>{
 
     }
 
-    // if(!isValidObjectId(id)){
-    //   res.status(400).json({msg:"Invalid request"})
-    //   return next(new ErrorResponse("Invalid request", 400))
-    //
-    // }
+    if(!isValidObjectId(id)){
+      res.status(400).json({msg:"Invalid request"})
+      return next(new ErrorResponse("Invalid request", 400))
+
+    }
     const user = await User.findById(id)
     if(!user){
       res.status(400).json({msg:"user not found"})
