@@ -3,6 +3,172 @@ const User = require('../models/User')
 const ErrorResponse = require('../utils/errorResponse')
 const VerificationToken = require('../models/VerificationToken')
 const nodemailer = require('nodemailer')
+const {isValidObjectId} = require('mongoose')
+
+// send email with this number for verification
+const mailTransport = () => nodemailer.createTransport({
+  host: "smtp.mailtrap.io",
+  port: 2525,
+  auth: {
+    user: process.env.MAILTRAP_USERNAME,
+    pass: process.env.MAILTRAP_PASSWORD
+  }
+});
+
+//generate welcome and verify your email template
+const generateEmailTemplate = code =>{
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset='UTF-8'>
+      <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+      <style>
+        @media only screen and (max-width:620px){
+          h1{
+            font-size:20px;
+            padding:5px;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div>
+          <div style="max-width:620px; margin:0 auto; font-family:sans-serif; color:#272727;">
+            <h1 style="background:#f6f6f6; padding:10px; text-align:center; color:#272727;">
+            We are delighted to welcome you to our shop
+
+            </h1>
+            <p>Please Verify Your Email To Continue Your Verification code is:</p>
+            <p style="width:80px; margin:0 auto; font-weight:bold; text-align:center; background:#f6f6f6; border-radius:5px; font-size:25px;">
+              ${code}
+            </p>
+          </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+const plainEmailTemplate = (heading,message) =>{
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset='UTF-8'>
+      <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+      <style>
+        @media only screen and (max-width:620px){
+          h1{
+            font-size:20px;
+            padding:5px;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div>
+          <div style="max-width:620px; margin:0 auto; font-family:sans-serif; color:#272727;">
+            <h1 style="background:#f6f6f6; padding:10px; text-align:center; color:#272727;">
+          ${heading}
+
+            </h1>
+
+            <p style=" text-align:center; color:#272727;">
+              ${message}
+            </p>
+          </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+const generatePasswordResetTemplate = url =>{
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset='UTF-8'>
+      <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+      <style>
+        @media only screen and (max-width:620px){
+          h1{
+            font-size:20px;
+            padding:5px;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div>
+          <div style="max-width:620px; margin:0 auto; font-family:sans-serif; color:#272727;">
+            <h1 style="background:#f6f6f6; padding:10px; text-align:center; color:#272727;">
+          Response To Your Reset Password Request
+
+            </h1>
+
+            <p style=" text-align:center; color:#272727;">
+              Please click the link below to reset your password
+            </p>
+            <div style="text-align: center">
+              <a href="${url}" style="font-family:sans-serif; margin:0 auto; padding:20px; text-align:center; background:#e63946; border-radius:5px; font-size:20px 10px; color:#fff; cursor:pointer; text-decoration:none; display:inline-block;">
+              Reset Password
+
+              </a>
+            </div>
+          </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+const generatePasswordResetTemplateSuccess = (heading, message) =>{
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset='UTF-8'>
+      <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+      <style>
+        @media only screen and (max-width:620px){
+          h1{
+            font-size:20px;
+            padding:5px;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div>
+          <div style="max-width:620px; margin:0 auto; font-family:sans-serif; color:#272727;">
+            <h1 style="background:#f6f6f6; padding:10px; text-align:center; color:#272727;">
+          ${heading}
+
+            </h1>
+
+            <p style=" text-align:center; color:#272727;">
+              ${message}
+            </p>
+
+          </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+
+//generate OTP
+const generateOTP = () =>{
+  let otp = ''
+  for(let i =0; i<6; i++){
+  const randVal =  Math.round(Math.random() * 9)
+  otp = otp + randVal
+  }
+  return otp
+}
+
 //register user
 exports.register= async (req,res,next)=>{
   const {username,email,password} = req.body;
@@ -72,14 +238,7 @@ exports.register= async (req,res,next)=>{
       email,
       password
     })
-    const generateOTP = () =>{
-      let otp = ''
-      for(let i =0; i<6; i++){
-      const randVal =  Math.round(Math.random() * 9)
-      otp = otp + randVal
-      }
-      return otp
-    }
+
     //generate the otp numbers used for verification
     const OTP = generateOTP()
     const verificationToken = new VerificationToken({
@@ -181,6 +340,63 @@ exports.login= async (req,res,next)=>{
 
   }
 }
+
+//verify Email
+exports.verifyEmail = async (req, res,next) => {
+  const { userId, otp} = req.body
+  if(!userId || !otp.trim()){
+    res.status(400).json({msg:"Invalid Request, missing parameters"})
+    return next(new ErrorResponse("Invalid Request, missing parameters", 400))
+
+  }
+
+  if(!isValidObjectId(userId)){
+    res.status(400).json({msg:"Invalid user Id"})
+    return next(new ErrorResponse("Invalid user Id", 400))
+
+  }
+
+  const user = await User.findById(userId)
+  if(!user){
+    res.status(400).json({msg:"Sorry user not found"})
+    return next(new ErrorResponse("Sorry user not found", 400))
+
+  }
+  if(user.verified){
+    res.status(400).json({msg:"This account is already verified"})
+    return next(new ErrorResponse("This account is already verified", 400))
+
+  }
+
+  const token = await VerificationToken.findOne({owner:user._id})
+  if(!token){
+    res.status(400).json({msg:"Sorry user not found"})
+    return next(new ErrorResponse("Sorry user not found", 400))
+
+  }
+
+  const isMatched = await token.compareToken(otp)
+
+  if(!isMatched){
+    res.status(400).json({msg:"Please provide a valid token"})
+    return next(new ErrorResponse("Please provide a valid token", 400))
+
+  }
+
+  user.verified = true;
+  await VerificationToken.findByIdAndDelete(token._id)
+  await user.save()
+
+  mailTransport().sendMail({
+    form:'winetastingVerification@winetasting.com',
+    to: user.email,
+    subject:'Welcome Email',
+    html: plainEmailTemplate("Email Verified Successfully", "Thanks for connecting with us")
+  })
+
+  res.json({success:true, message:"your email is verified.", user:{name:user.name,email:user.email,id:user._id}})
+}
+
 
 //reset user password
 exports.forgotpassword= async (req,res,next)=>{
