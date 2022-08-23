@@ -1,7 +1,7 @@
 const HomePage = () =>{
   return(
     <div>
-      welcome to winetasting homepage
+      my mern stack app
     </div>
   )
 }

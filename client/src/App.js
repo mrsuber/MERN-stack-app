@@ -7,7 +7,7 @@ const App=()=> {
 
       <div>
 
-        <div>welcome to  ticket selling app</div>
+        <div>welcome to  Mern stack app</div>
 
       </div>
 
