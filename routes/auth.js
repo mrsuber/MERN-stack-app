@@ -1,6 +1,6 @@
 const express=require('express');
 const router = express.Router();
-
+const {isResetTokenValid} = require('../middleware/user')
 const {register,login,verifyEmail,forgotpassword,resetpassword} = require('../controllers/auth')
 
 router.route("/register").post(register)
@@ -10,7 +10,8 @@ router.route("/login").post(login)
 
 router.route("/forgotpassword").post(forgotpassword)
 
-router.route("/resetpassword/:resetToken").put(resetpassword)
+router.route("/reset-password").post(isResetTokenValid, resetpassword)
+
 
 
 module.exports = router;

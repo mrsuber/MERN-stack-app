@@ -2,6 +2,8 @@ const crypto = require("crypto")
 const User = require('../models/User')
 const ErrorResponse = require('../utils/errorResponse')
 const VerificationToken = require('../models/VerificationToken')
+const ResetToken = require('../models/ResetToken')
+
 const nodemailer = require('nodemailer')
 const {isValidObjectId} = require('mongoose')
 
@@ -168,6 +170,31 @@ const generateOTP = () =>{
   }
   return otp
 }
+
+//check email
+const handleOnChange = ( email ) => {
+
+  // don't remember from where i copied this code, but this works.
+  let re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+
+  if ( re.test(email) ) {
+      return true
+  }
+  else {
+      return false
+  }
+
+}
+
+//create randomBytes
+const createRandomBytes = () =>
+new Promise((resolve, reject) =>{
+  crypto.randomBytes(30, (err,buff) =>{
+    if(err) reject(err)
+    const token = buff.toString('hex')
+    resolve(token)
+  })
+})
 
 //register user
 exports.register= async (req,res,next)=>{
@@ -402,69 +429,89 @@ exports.verifyEmail = async (req, res,next) => {
 exports.forgotpassword= async (req,res,next)=>{
   const {email} = req.body;
 
-  try{
-    const user=await User.findOne({email})
-
-    if(!user){
-      return next(new ErrorResponse("Email could not be sent",404))
-    }
-    const resetToken = user.getResetPasswordToken()
-
-    await user.save()
-
-    const resetUrl = `http://localhost:3000/passwordreset/${resetToken}`
-    console.log(resetUrl)
-    const message = `
-    <h1>You have requested a password reset</h1>
-    <p>Please go to this link to reset your password </p>
-    <a href=${resetUrl} clicktracking=off>${resetUrl}</a>
-    `
-
-    try{
-      // await sendEmail({ to:user.email, subject:"Password Reset Request",text:message   })
-
-      res.status(200).json({success:true, data:"Email sent"})
-    }catch(error){
-      user.resetPasswordToken = undefined;
-      user.resetPasswordExpire = undefined;
-
-      await user.save();
-
-      return next(new ErrorResponse("Email could not be sent",500))
-    }
-  }catch(error){
-    next(error)
+  if(handleOnChange(email)===false){
+    res.status(400).json({msg:"This email is invalid"})
+    return next(new ErrorResponse("This email is invalid", 400))
   }
+    try{
+      const user=await User.findOne({email})
+
+      if(!user){
+        return next(new ErrorResponse("Email could not be sent",404))
+      }
+      // const resetToken = user.getResetPasswordToken()
+      const token = await ResetToken.findOne({owner:user._id})
+      if(token){
+        res.status(400).json({msg:"only one hour you can request another token"})
+        return next(new ErrorResponse("only one hour you can request another token", 400))
+
+      }
+      const randomBytes = await createRandomBytes()
+      const resetToken = new ResetToken({owner: user._id, token:randomBytes})
+      await resetToken.save();
+      mailTransport().sendMail({
+        form:'winetastingSecurity@winetasting.com',
+        to: user.email,
+        subject:'Password Reset',
+        html: generatePasswordResetTemplate(`http://localhost:3000/reset-password?token=${randomBytes}&id=${user._id}`)
+      })
+
+      res.status(200).json({success:true,message:'Password reset link is sent to your email.'})
+
+    }catch(error){
+      next(error)
+    }
 }
 
 //password reset done
 exports.resetpassword= async (req,res,next)=>{
-  const resetPasswordToken = crypto.createHash("sha256").update(req.params.resetToken).digest("hex");
+  const {password} = req.body
+  if(!password){
+    res.status(400).json({msg:"Please input new password"})
+    return next(new ErrorResponse("Please input new password", 400))
 
-  try{
-    const user = await User.findOne({
-      resetPasswordToken,
-      resetPasswordExpire:{$gt:Date.now()}
-    })
-
-    if(!user){
-      return next(new ErrorResponse("Invalid Reset Token",400))
-    }
-
-    user.password = req.body.password;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-
-    await user.save()
-
-    res.status(201).json({
-      success:true,
-      data:"Password Reset Success"
-    })
-
-  }catch(error){
-    next(error)
   }
+try{
+
+  const user = await User.findById(req.user._id).select('+password')
+
+
+  if(!user){
+    res.status(400).json({msg:"User not found"})
+    return next(new ErrorResponse("User not found", 400))
+
+  }
+
+  const isSamePassword = await user.matchPasswords(password)
+  if(isSamePassword){
+    res.status(400).json({msg:"New Password must be different"})
+    return next(new ErrorResponse("New Password must be different", 400))
+
+  }
+
+  if(password.trim().length < 6 || password.trim().length >20 ){
+   res.status(400).json({msg:"Password mustbe at least 6 to 20 characters"})
+   return next(new ErrorResponse("Password mustbe at least 6 to 20 characters", 400))
+
+  }
+  user.password = password.trim()
+  await user.save()
+  const resetToken = await ResetToken.findOneAndRemove({owner:user._id})
+
+  mailTransport().sendMail({
+    form:'winetastingSecurity@winetasting.com',
+    to: user.email,
+    subject:'Password Reset Successfully',
+    html: generatePasswordResetTemplateSuccess('Password Reset Successfully', 'Now you can login with new password')
+  })
+  res.status(201).json({
+    success:true,
+    data:"Password Reset Success"
+  })
+
+}catch(error){
+  next(error)
+}
 }
 
 const sendToken = (user,statusCode,res) =>{
