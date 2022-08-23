@@ -10,7 +10,7 @@ router.route("/login").post(login)
 
 router.route("/forgotpassword").post(forgotpassword)
 
-router.route("/reset-password").post( resetpassword)
+// router.route("/reset-password").post( resetpassword)
 
 
 
