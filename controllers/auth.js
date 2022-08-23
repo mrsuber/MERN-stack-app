@@ -1,18 +1,145 @@
 const crypto = require("crypto")
 const User = require('../models/User')
 const ErrorResponse = require('../utils/errorResponse')
-// const sendEmail = require('../utils/sendEmail')
+const VerificationToken = require('../models/VerificationToken')
+const nodemailer = require('nodemailer')
 //register user
 exports.register= async (req,res,next)=>{
   const {username,email,password} = req.body;
 
+  let handleOnChange = ( email ) => {
+
+    // don't remember from where i copied this code, but this works.
+    let re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+
+    if ( re.test(email) ) {
+        return true
+    }
+    else {
+        return false
+    }
+
+}
+
+
+  if(!username){
+    res.status(400).json({success:true, msg:'please provide a username, good one'})
+
+    return next(new ErrorResponse("please provide a username, good one", 400))
+  }
+
+  if(username.trim().length<3 || username.trim().length>20){
+    res.status(400).json({success:true, msg:'Name must be 3 to 20 characters long!'})
+
+    return next(new ErrorResponse("Name must be 3 to 20 characters long!", 400))
+
+  }
+  // username = username.toLowerCase().replace(/ /g,'')
+
+
+  const username1 = await User.findOne({username:username})
+  const email1 = await User.findOne({email:email})
+
+
+
+  if(username1){
+   res.status(400).json({msg:"This username already exits."})
+   return next(new ErrorResponse("This username already exits.", 400))
+
+  }
+  if(handleOnChange(email)===false){
+    res.status(400).json({msg:"This email is invalid"})
+    return next(new ErrorResponse("This email is invalid", 400))
+  }
+  if(email1){
+   res.status(400).json({msg:"This email already exits."})
+   return next(new ErrorResponse("This email already exitsed.", 400))
+  }
+
+  if(password.trim().length < 6){
+   res.status(400).json({msg:"Password mustbe at least 6 characters"})
+   return next(new ErrorResponse("Password mustbe at least 6 characters", 400))
+
+  }
+
+
   //now we are working with database
+
+
   try{
-    const user= await User.create({
-      username,email,password
+    const newUser = new User({
+      username,
+      email,
+      password
+    })
+    const generateOTP = () =>{
+      let otp = ''
+      for(let i =0; i<6; i++){
+      const randVal =  Math.round(Math.random() * 9)
+      otp = otp + randVal
+      }
+      return otp
+    }
+    //generate the otp numbers used for verification
+    const OTP = generateOTP()
+    const verificationToken = new VerificationToken({
+      owner: newUser._id,
+      token: OTP
+      })
+    await verificationToken.save()
+    await newUser.save()
+
+    // send email with this number for verification
+    const mailTransport = () => nodemailer.createTransport({
+      host: "smtp.mailtrap.io",
+      port: 2525,
+      auth: {
+        user: process.env.MAILTRAP_USERNAME,
+        pass: process.env.MAILTRAP_PASSWORD
+      }
+    });
+    const generateEmailTemplate = code =>{
+      return `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset='UTF-8'>
+          <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+          <style>
+            @media only screen and (max-width:620px){
+              h1{
+                font-size:20px;
+                padding:5px;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div>
+              <div style="max-width:620px; margin:0 auto; font-family:sans-serif; color:#272727;">
+                <h1 style="background:#f6f6f6; padding:10px; text-align:center; color:#272727;">
+                We are delighted to welcome you to our shop
+
+                </h1>
+                <p>Please Verify Your Email To Continue Your Verification code is:</p>
+                <p style="width:80px; margin:0 auto; font-weight:bold; text-align:center; background:#f6f6f6; border-radius:5px; font-size:25px;">
+                  ${code}
+                </p>
+              </div>
+          </div>
+        </body>
+        </html>
+      `
+    }
+
+    mailTransport().sendMail({
+      form:'winetastingVerification@winetasting.com',
+      to: newUser.email,
+      subject:'Verify your email account',
+      html: generateEmailTemplate(OTP)
     })
 
-    sendToken(user, 201,res)
+    sendToken(newUser, 201,res)
   }catch(error){
     next(error)
 
