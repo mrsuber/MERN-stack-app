@@ -8,7 +8,7 @@ router.route("/verify-email").post(verifyEmail)
 
 router.route("/login").post(login)
 
-router.route("/forgotpassword").post(forgotpassword)
+// router.route("/forgotpassword").post(forgotpassword)
 
 // router.route("/reset-password").post( resetpassword)
 
