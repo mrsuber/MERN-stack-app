@@ -425,130 +425,130 @@ exports.verifyEmail = async (req, res,next) => {
 }
 
 
-//reset user password
-exports.forgotpassword= async (req,res,next)=>{
-  const {email} = req.body;
+// //reset user password
+// exports.forgotpassword= async (req,res,next)=>{
+//   const {email} = req.body;
+//
+//   if(handleOnChange(email)===false){
+//     res.status(400).json({msg:"This email is invalid"})
+//     return next(new ErrorResponse("This email is invalid", 400))
+//   }
+//     try{
+//       const user=await User.findOne({email})
+//
+//       if(!user){
+//         return next(new ErrorResponse("Email could not be sent",404))
+//       }
+//       // const resetToken = user.getResetPasswordToken()
+//       const token = await ResetToken.findOne({owner:user._id})
+//       if(token){
+//         res.status(400).json({msg:"only one hour you can request another token"})
+//         return next(new ErrorResponse("only one hour you can request another token", 400))
+//
+//       }
+//       const randomBytes = await createRandomBytes()
+//       const resetToken = new ResetToken({owner: user._id, token:randomBytes})
+//       await resetToken.save();
+//       mailTransport().sendMail({
+//         form:'winetastingSecurity@winetasting.com',
+//         to: user.email,
+//         subject:'Password Reset',
+//         html: generatePasswordResetTemplate(`http://localhost:3000/reset-password?token=${randomBytes}&id=${user._id}`)
+//       })
+//
+//       res.status(200).json({success:true,message:'Password reset link is sent to your email.'})
+//
+//     }catch(error){
+//       next(error)
+//     }
+// }
 
-  if(handleOnChange(email)===false){
-    res.status(400).json({msg:"This email is invalid"})
-    return next(new ErrorResponse("This email is invalid", 400))
-  }
-    try{
-      const user=await User.findOne({email})
-
-      if(!user){
-        return next(new ErrorResponse("Email could not be sent",404))
-      }
-      // const resetToken = user.getResetPasswordToken()
-      const token = await ResetToken.findOne({owner:user._id})
-      if(token){
-        res.status(400).json({msg:"only one hour you can request another token"})
-        return next(new ErrorResponse("only one hour you can request another token", 400))
-
-      }
-      const randomBytes = await createRandomBytes()
-      const resetToken = new ResetToken({owner: user._id, token:randomBytes})
-      await resetToken.save();
-      mailTransport().sendMail({
-        form:'winetastingSecurity@winetasting.com',
-        to: user.email,
-        subject:'Password Reset',
-        html: generatePasswordResetTemplate(`http://localhost:3000/reset-password?token=${randomBytes}&id=${user._id}`)
-      })
-
-      res.status(200).json({success:true,message:'Password reset link is sent to your email.'})
-
-    }catch(error){
-      next(error)
-    }
-}
-
-//password reset done
-exports.resetpassword= async (req,res,next)=>{
-  const {token, id} = req.query
-  if(!token || !id){
-    res.status(400).json({msg:"Invalid request1"})
-    return next(new ErrorResponse("Invalid request", 400))
-
-  }
-  if(!isValidObjectId(id)){
-    res.status(400).json({msg:"Invalid request"})
-    return next(new ErrorResponse("Invalid request", 400))
-
-  }
-
-  const user = await User.findById(id)
-  if(!user){
-    res.status(400).json({msg:"user not found"})
-    return next(new ErrorResponse("user not found", 400))
-
-  }
-
-  const resetToken = await ResetToken.findOne({owner:user._id})
-
-  if(!resetToken){
-    res.status(400).json({msg:"Reset token not found!"})
-    return next(new ErrorResponse("Reset token not found!", 400))
-
-  }
-
-  const isValid = await resetToken.compareToken(token)
-  if(!isValid){
-    res.status(400).json({msg:"Reset token is invalid!"})
-    return next(new ErrorResponse("Reset token is invalid!", 400))
-
-  }
-
-  req.user = user
-
-  const {password} = req.body
-  if(!password){
-    res.status(400).json({msg:"Please input new password"})
-    return next(new ErrorResponse("Please input new password", 400))
-
-  }
-try{
-
-  const user = await User.findById(req.user._id).select('+password')
-
-
-  if(!user){
-    res.status(400).json({msg:"User not found"})
-    return next(new ErrorResponse("User not found", 400))
-
-  }
-
-  const isSamePassword = await user.matchPasswords(password)
-  if(isSamePassword){
-    res.status(400).json({msg:"New Password must be different"})
-    return next(new ErrorResponse("New Password must be different", 400))
-
-  }
-
-  if(password.trim().length < 6 || password.trim().length >20 ){
-   res.status(400).json({msg:"Password mustbe at least 6 to 20 characters"})
-   return next(new ErrorResponse("Password mustbe at least 6 to 20 characters", 400))
-
-  }
-  user.password = password.trim()
-  await user.save()
-  const resetToken = await ResetToken.findOneAndRemove({owner:user._id})
-
-  mailTransport().sendMail({
-    form:'winetastingSecurity@winetasting.com',
-    to: user.email,
-    subject:'Password Reset Successfully',
-    html: generatePasswordResetTemplateSuccess('Password Reset Successfully', 'Now you can login with new password')
-  })
-  res.status(201).json({
-    success:true,
-    data:"Password Reset Success"
-  })
-
-}catch(error){
-  next(error)
-}
-}
+// //password reset done
+// exports.resetpassword= async (req,res,next)=>{
+//   const {token, id} = req.query
+//   if(!token || !id){
+//     res.status(400).json({msg:"Invalid request1"})
+//     return next(new ErrorResponse("Invalid request", 400))
+//
+//   }
+//   if(!isValidObjectId(id)){
+//     res.status(400).json({msg:"Invalid request"})
+//     return next(new ErrorResponse("Invalid request", 400))
+//
+//   }
+//
+//   const user = await User.findById(id)
+//   if(!user){
+//     res.status(400).json({msg:"user not found"})
+//     return next(new ErrorResponse("user not found", 400))
+//
+//   }
+//
+//   const resetToken = await ResetToken.findOne({owner:user._id})
+//
+//   if(!resetToken){
+//     res.status(400).json({msg:"Reset token not found!"})
+//     return next(new ErrorResponse("Reset token not found!", 400))
+//
+//   }
+//
+//   const isValid = await resetToken.compareToken(token)
+//   if(!isValid){
+//     res.status(400).json({msg:"Reset token is invalid!"})
+//     return next(new ErrorResponse("Reset token is invalid!", 400))
+//
+//   }
+//
+//   req.user = user
+//
+//   const {password} = req.body
+//   if(!password){
+//     res.status(400).json({msg:"Please input new password"})
+//     return next(new ErrorResponse("Please input new password", 400))
+//
+//   }
+// try{
+//
+//   const user = await User.findById(req.user._id).select('+password')
+//
+//
+//   if(!user){
+//     res.status(400).json({msg:"User not found"})
+//     return next(new ErrorResponse("User not found", 400))
+//
+//   }
+//
+//   const isSamePassword = await user.matchPasswords(password)
+//   if(isSamePassword){
+//     res.status(400).json({msg:"New Password must be different"})
+//     return next(new ErrorResponse("New Password must be different", 400))
+//
+//   }
+//
+//   if(password.trim().length < 6 || password.trim().length >20 ){
+//    res.status(400).json({msg:"Password mustbe at least 6 to 20 characters"})
+//    return next(new ErrorResponse("Password mustbe at least 6 to 20 characters", 400))
+//
+//   }
+//   user.password = password.trim()
+//   await user.save()
+//   const resetToken = await ResetToken.findOneAndRemove({owner:user._id})
+//
+//   mailTransport().sendMail({
+//     form:'winetastingSecurity@winetasting.com',
+//     to: user.email,
+//     subject:'Password Reset Successfully',
+//     html: generatePasswordResetTemplateSuccess('Password Reset Successfully', 'Now you can login with new password')
+//   })
+//   res.status(201).json({
+//     success:true,
+//     data:"Password Reset Success"
+//   })
+//
+// }catch(error){
+//   next(error)
+// }
+// }
 
 const sendToken = (user,statusCode,res) =>{
   const token = user.getSignedToken()
